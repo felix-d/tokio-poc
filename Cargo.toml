@@ -1,0 +1,12 @@
+[package]
+name = "redis-proxy"
+version = "0.1.0"
+authors = ["Felix Descoteaux <flx.descoteaux@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+tokio = "*"
+tokio-io = "0.1"
+failure = "*"
+futures = "0.1"
+tokio-channel = "0.1"
