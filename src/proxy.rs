@@ -1,9 +1,7 @@
-use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-use tokio::timer::Delay;
-use tokio::io::write_all;
+use tokio::io::{copy};
 
 use crate::connection::Connection;
 use crate::pool::Pool;
@@ -43,24 +41,12 @@ impl Proxy {
     }
 
     fn proxy(client_stream: TcpStream, connection: Connection) -> impl Future<Item = (), Error = ()> {
-        // This is where the proxying happens. We have access to both client and server async tcp
-        // streams now we need to send data from the client reader to the server writer and vice
-        // versa. For some ideas on how this can be achieved see
-        // https://github.com/tokio-rs/tokio/blob/master/examples/proxy.rs
-        // However note that in this example, a new server connection is created for the duration
-        // of the request. In our case we want to keep the server connection opened so it's
-        // a bit more delicate.
-        let _server_stream = connection.handle();
+        let (server_reader, server_writer) = connection.handle().split();
+        let (client_reader, client_writer) = client_stream.split();
 
-        // In the meantime, here's a POC that fakes a server response after a delay.
-        let when = Instant::now() + Duration::from_millis(2000);
+        let client_to_server = copy(client_reader, server_writer);
+        let server_to_client = copy(server_reader, client_writer);
 
-        Delay::new(when)
-            .map_err(|_| ())
-            .and_then(move |_| {
-                write_all(client_stream, b"hello\n")
-                    .map(|_| ())
-                    .map_err(|_| ())
-            })
+        client_to_server.select(server_to_client).map(|_| ()).map_err(|_| ())
     }
 }
